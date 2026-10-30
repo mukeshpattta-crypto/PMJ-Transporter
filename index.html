@@ -1,5 +1,6 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PMJ Transporter</title>
+<link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#0f5c4d"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="PMJ">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#f3f1ec;--card:#fff;--ink:#1d2320;--mut:#6b736e;--acc:#0f5c4d;--warn:#b4412a;--ln:#dcd8cf}
@@ -109,5 +110,7 @@ function exportAll(auto){const d=new Date().toISOString().slice(0,10),fin=['rate
 function autoExp(){if(!S.set.lastExport){S.set.lastExport=new Date().toISOString();return save()}if((Date.now()-new Date(S.set.lastExport))/864e5>=15)exportAll(true)}
 const _vd=vDash;vDash=function(){_vd();$('#v').insertAdjacentHTML('afterbegin',`<div class="card"><button onclick="exportAll()">⬇ ${t('exp2')}</button> <span class="mut">${t('last')}: ${(S.set.lastExport||'-').slice(0,10)}</span></div>`)};
 const _r=render;let _ae=0;render=function(){_r();if(U&&!_ae){_ae=1;autoExp()}};
+let IP=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();IP=e;const b=document.createElement('button');b.textContent='⬇ Install app';b.style.cssText='position:fixed;right:12px;bottom:80px;z-index:9;box-shadow:0 2px 8px #0005';b.onclick=()=>{IP.prompt();b.remove()};document.body.append(b)});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();
 </script></body></html>
