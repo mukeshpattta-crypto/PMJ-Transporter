@@ -20,7 +20,7 @@ nav button{flex:1;background:none;color:var(--mut);border-radius:0;padding:14px 
 .k{display:grid;grid-template-columns:1fr 1fr;gap:8px}.k div{background:var(--bg);border-radius:10px;padding:10px}.k small{color:var(--mut);display:block}.k b{font-size:20px}
 .row{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--ln)}.row:last-child{border:0}
 .p{color:var(--acc)}.l{color:var(--warn)}.del{opacity:.5;text-decoration:line-through}.hint{background:var(--bg);padding:8px;border-radius:8px;font-size:14px;margin-top:8px}
-.bar{height:10px;background:var(--acc);border-radius:5px}.mut{color:var(--mut);font-size:13px}.hide{display:none}
+.tb{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.tb th{color:var(--mut);font-weight:600;text-align:right;padding:6px 4px;border-bottom:2px solid var(--ln);white-space:nowrap}.tb td{text-align:right;padding:7px 4px;border-bottom:1px solid var(--ln);white-space:nowrap}.tb th:first-child,.tb td:first-child{text-align:left}button.on2{background:var(--acc);color:#fff}.hint.warn{color:var(--warn)}.bar{height:10px;background:var(--acc);border-radius:5px}.mut{color:var(--mut);font-size:13px}.hide{display:none}
 </style></head><body>
 <div id="app"></div>
 <script>
@@ -47,16 +47,16 @@ function login(){$('#app').innerHTML=`<header><b>PMJ Transporter</b>${langSel()}
 const langSel=()=>`<select style="width:auto" onchange="S.lang=this.value;save();render()">${[['en','English'],['hi','हिंदी'],['mr','मराठी']].map(l=>`<option value="${l[0]}" ${S.lang==l[0]?'selected':''}>${l[1]}</option>`).join('')}</select>`;
 async function doLogin(){const r=$('#r').value,pin=$('#pin').value;U={role:r,pin};
  if(S.set.url){let d;try{d=await(await fetch(S.set.url+'?pin='+encodeURIComponent(pin))).json()}catch(e){U=null;return toast('Cannot reach the Google Sheet. Set the deployment access to Anyone.')}if(d.error){U=null;return toast(d.error=='bad pin'?'Wrong PIN (check ADMIN_PIN / DRIVER_PIN in Apps Script)':'Server error: '+d.error)}const pt=S.trips.filter(x=>x._pend),pe=S.exps.filter(x=>x._pend);U.role=d.role;for(const k in d.settings||{}){try{S.set[k]=JSON.parse(d.settings[k])}catch(e){}}if(S.set.rc)RC.r=S.set.rc;S.trips=d.trips.map(x=>({...x,deleted:x.status=='Deleted'}));S.exps=d.exps.map(x=>({...x,deleted:x.status=='Deleted'}));pt.forEach(x=>{const i=S.trips.findIndex(y=>y.id==x.id);i<0?S.trips.push(x):S.trips[i]=x});pe.forEach(x=>{const i=S.exps.findIndex(y=>y.id==x.id);i<0?S.exps.push(x):S.exps[i]=x});save()}
- else{const p=S.set.pins||{admin:'1111',transporter:'2222'};if(p[r]!=pin){U=null;return toast('Wrong PIN')}}FM=null;tab='trips';render();if(S.trips.concat(S.exps).some(x=>x._pend))flush().then(render)}
+ else{const p=S.set.pins||{admin:'1111',transporter:'2222'};if(p[r]!=pin){U=null;return toast('Wrong PIN')}}FM=null;tab='trips';migrate();render();if(S.trips.concat(S.exps).some(x=>x._pend))flush().then(render)}
 function render(){if(!U)return login();const tabs=[['trips','trips'],['exp','exp'],['dash','dash']].concat(adm()?[['set','set']]:[]);
  $('#app').innerHTML=`<header><b>PMJ · ${adm()?'Admin':'Transporter'}</b><span>${langSel()} <button class="s" style="color:#fff;border-color:#fff" onclick="U=null;render()">${t('out')}</button></span></header><div id="v"></div><nav>${tabs.map(x=>`<button class="${tab==x[0]?'on':''}" onclick="tab='${x[0]}';FM=null;render()">${t(x[1])}</button>`).join('')}</nav>`;
  ({trips:vTrips,exp:vExp,dash:vDash,set:vSet})[tab]()}
 const inp=(k,lb,ty='text',ex='')=>`<div><label>${t(lb)}</label><input id="f_${k}" type="${ty}" value="${esc(FM[k]??'')}" oninput="FM.${k}=this.value;${ex}"></div>`;
-function vTrips(){if(FM)return tripForm();const L=S.trips.slice().sort((a,b)=>b.date>a.date?1:-1);
- $('#v').innerHTML=`<div class="card"><button onclick="FM={id:uid(),date:today(),points:0,halting:0};render()">+ ${t('trips')}</button></div>`+(L.length?L.map(x=>{const c=calc(x);return`<div class="card ${x.deleted?'del':''}"><div class="row" style="border:0"><b>${x.date} · ${esc(x.veh)}</b><span>${esc(x.dest)}</span></div><div class="mut">${esc(x.size)} · ${c.km} km · LR ${esc(x.lr||'-')}</div>${adm()?`<div>${t('billable')}: ${fmt(c.bill)} · <b class="${c.profit<0?'l':'p'}">${fmt(c.profit)}</b></div>`:`<div>${t('reimb')}: ${fmt(c.reimb)}</div>`}<p>${x.deleted?`<button class="s" onclick="tog('trips','${x.id}')">${t('rest')}</button>`:`<button class="s" onclick="FM={...S.trips.find(y=>y.id=='${x.id}')};render()">${t('edit')}</button> <button class="s d" onclick="tog('trips','${x.id}')">${t('del')}</button>`}</p></div>`}).join(''):`<p class="mut" style="margin:14px">${t('empty')}</p>`)}
+function vTrips(){if(FM)return tripForm();const L=S.trips.filter(x=>!Q||[x.lr,x.veh,x.dest,x.driver,x.date].join(' ').toLowerCase().includes(Q)).sort((a,b)=>b.date>a.date?1:b.date<a.date?-1:n(b.start)-n(a.start));
+ $('#v').innerHTML=`<div class="card"><button onclick="FM={id:uid(),date:today(),points:0,halting:0};render()">+ ${t('trips')}</button><input id="q" style="margin-top:8px" placeholder="🔍 Search LR / vehicle / destination / driver" value="${esc(Q)}" oninput="Q=this.value.toLowerCase().trim();vTrips();const s=$('#q');s.focus();s.setSelectionRange(99,99)">${Q?`<p class="mut">${L.length} found</p>`:''}</div>`+(L.length?L.map(x=>{const c=calc(x);return`<div class="card ${x.deleted?'del':''}"><div class="row" style="border:0"><b>${dmy(x.date)} · ${esc(x.veh)}</b><span>${esc(x.dest)}</span></div><div class="mut">${esc(x.size)} · ${c.km} km · LR ${esc(x.lr||'-')}${x.driver?' · '+esc(x.driver):''}</div>${adm()?`<div>${t('billable')}: ${fmt(c.bill)} · <b class="${c.profit<0?'l':'p'}">${fmt(c.profit)}</b></div>`:`<div>${t('reimb')}: ${fmt(c.reimb)}</div>`}<p>${x.deleted?`<button class="s" onclick="tog('trips','${x.id}')">${t('rest')}</button>`:`<button class="s" onclick="FM={...S.trips.find(y=>y.id=='${x.id}')};render()">${t('edit')}</button> <button class="s d" onclick="tog('trips','${x.id}')">${t('del')}</button>`}</p></div>`}).join(''):`<p class="mut" style="margin:14px">${t('empty')}</p>`)}
 function tripForm(){const f=FM,vs=[...new Set(S.trips.map(x=>x.veh))],ds=[...new Set(S.trips.map(x=>x.driver))];
  $('#v').innerHTML=`<div class="card"><div class="g">${inp('date','date','date')}<div><label>${t('veh')}</label><input id="f_veh" list="vl" value="${esc(f.veh)}" oninput="FM.veh=this.value.toUpperCase().replace(/\\s+/g,'');fill()"><datalist id="vl">${vs.map(v=>`<option>${esc(v)}`).join('')}</datalist></div>
- <div class="g3"><label>${t('lr')}</label><input value="${esc(f.lr)}" oninput="FM.lr=this.value"></div>
+ <div class="g3" id="lrw">${lrUI()}</div>
  <div><label>${t('size')}</label><select onchange="delete FM.rate;FM.size=this.value;if(FM.hdays)autoHalt();else upd()"><option value="">-</option>${RC.sizes.map(s=>`<option ${f.size==s?'selected':''}>${s}`).join('')}</select></div>
  <div><label>${t('dest')}</label><input list="dl" value="${esc(f.dest)}" oninput="delete FM.rate;FM.dest=this.value.toUpperCase();upd()"><datalist id="dl">${Object.keys(RC.r).map(d=>`<option>${esc(d)}`).join('')}</datalist></div>
  ${inp('start','start','number','upd()')}${inp('end','end','number','upd()')}${inp('toll','toll','number','upd()')}${inp('labour','labour','number','upd()')}${inp('wages','wages','number','upd()')}
@@ -88,12 +88,6 @@ function shot(el){const file=el.files[0];if(!file)return;const im=new Image();im
  const {jsPDF}=window.jspdf,p=new jsPDF({unit:'px',format:[c.width,c.height]});p.addImage(c.toDataURL('image/jpeg',.7),'JPEG',0,0,c.width,c.height);const b64=p.output('datauristring').split(',')[1];$('#bs').textContent='Uploading…';
  const r=await api('POST',{action:'bill',name:`${FM.veh||'bill'}_${FM.date}.pdf`,data:b64});if(S.set.url&&!(r&&r.url)){$('#bs').textContent='Upload failed. Check internet and try again.';return}FM.billUrl=r&&r.url?r.url:'data:application/pdf;base64,'+b64;$('#bs').textContent='📄 PDF ready'}catch(e){toast('Could not make the PDF. Check internet and try again.')}};im.onerror=()=>toast('Could not read the photo');im.src=URL.createObjectURL(file)}
 async function saveExp(){const f=FM;if(!f.veh||!f.desc)return toast('Vehicle + description?');f.veh=f.veh.toUpperCase().replace(/\s+/g,'');if(!n(f.cost))return toast('Enter the cost');const i=S.exps.findIndex(x=>x.id==f.id);f.status='Active';log('Expenses',f,i<0?'create':'edit');i<0?S.exps.push(f):S.exps[i]=f;save();await push('Expenses',f,i<0?'create':'edit');FM=null;render()}
-function vDash(){const T=S.trips.filter(x=>!x.deleted),E=S.exps.filter(x=>!x.deleted),C=T.map(calc),sum=(a,k)=>a.reduce((s,x)=>s+x[k],0),ex=E.reduce((s,x)=>s+n(x.cost),0),by={};
- T.forEach(x=>by[x.dest]=(by[x.dest]||0)+1);const mx=Math.max(1,...Object.values(by)),vp={};T.forEach((x,i)=>vp[x.veh]=(vp[x.veh]||0)+C[i].profit);
- let h=`<div class="card"><div class="k"><div><small>${t('trips')}</small><b>${T.length}</b></div><div><small>${t('km')}</small><b>${sum(C,'km')}</b></div><div><small>${t('reimb')}</small><b>${fmt(sum(C,'reimb'))}</b></div><div><small>${t('expTot')}</small><b>${fmt(ex)}</b></div>`;
- if(adm())h+=`<div><small>${t('revenue')}</small><b>${fmt(sum(C,'bill'))}</b></div><div><small>${t('spend')}</small><b>${fmt(sum(C,'total')+ex)}</b></div><div style="grid-column:1/-1"><small>${t('profit')}</small><b class="${sum(C,'profit')-ex<0?'l':'p'}">${fmt(sum(C,'profit')-ex)}</b></div>`;
- h+=`</div></div><div class="card"><b>${t('byDest')}</b>${Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([d,v])=>`<div style="margin-top:8px">${esc(d)} (${v})<div class="bar" style="width:${v/mx*100}%"></div></div>`).join('')||`<p class="mut">${t('empty')}</p>`}</div>`;
- if(adm())h+=`<div class="card"><b>${t('byVeh')}</b>${Object.entries(vp).map(([v,p])=>`<div class="row"><span>${esc(v)}</span><b class="${p<0?'l':'p'}">${fmt(p)}</b></div>`).join('')}</div>`;$('#v').innerHTML=h}
 const pushSet=()=>{save();api('POST',{action:'settings',data:S.set});toast(t('saved'))};
 let rcSel='';
 function vSet(){const s=S.set;$('#v').innerHTML=`<div class="card"><label>${t('ep')}</label><input type="number" value="${s.extra}" onchange="S.set.extra=+this.value;pushSet()"><label>${t('url')}</label><input value="${esc(s.url)}" onchange="S.set.url=this.value.trim();save()" placeholder="https://script.google.com/macros/s/.../exec"><p class="mut">With a URL set, PINs are checked by the Google Sheet (ADMIN_PIN / DRIVER_PIN).</p>
@@ -104,15 +98,162 @@ $('#v').insertAdjacentHTML('afterbegin',`<div class="card"><b>${t('hr')}</b><lab
 <div class="card"><b>${t('rc')}</b><label>${t('dest')}</label><select onchange="rcSel=this.value;render()"><option value="">-</option>${Object.keys(RC.r).map(x=>`<option ${x==rcSel?'selected':''}>${esc(x)}`).join('')}</select>${d?`<label>${t('rate1')}</label><div class="g">${RC.sizes.map((z,i)=>`<div><label>${z}</label><input type="number" value="${d[i]}" onchange="RC.r['${rcSel}'][${i}]=+this.value;S.set.rc=RC.r;pushSet()"></div>`).join('')}</div><p><button class="s d" onclick="if(confirm('Delete '+rcSel+'?')){delete RC.r[rcSel];rcSel='';S.set.rc=RC.r;pushSet();render()}">${t('del')}</button></p>`:`<p class="mut">${t('noRC')}</p>`}<label>${t('addd')}</label><input id="nd" placeholder="NAME"><p><button class="s" onclick="addDest()">+ ${t('addd')}</button></p></div>`)};
 function addDest(){const v=$('#nd').value.trim().toUpperCase();if(!v||RC.r[v])return toast('Name?');RC.r[v]=RC.sizes.map(()=>0);S.set.rc=RC.r;rcSel=v;pushSet();render()}
 function csv(rows,cols){const q=v=>{v=String(v??'');if(/^[=+@-]/.test(v)&&isNaN(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};return '\ufeff'+[cols.join(',')].concat(rows.map(r=>cols.map(c=>q(r[c])).join(','))).join('\n')}
-function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.append(a);a.click();a.remove()}
+function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(text instanceof Blob?text:new Blob([text],{type}));a.download=name;document.body.append(a);a.click();a.remove()}
 function exportAll(auto){const d=today(),fin=['rate','diesel','totalCost','billable','profit'],tc=['date','lr','veh','size','dest','start','end','km','toll','labour','wages','driver','dieselKm','points','hdays','halting','remark'].concat(adm()?fin:[],['reimb','status']),ec=['date','veh','desc','qty','cost','remark','billUrl','status'];
  const tr=S.trips.map(x=>({...x,km:calc(x).km,status:x.deleted?'Deleted':'Active'})),ex=S.exps.map(x=>({...x,status:x.deleted?'Deleted':'Active'}));
  dl(`PMJ_trips_${d}.csv`,csv(tr,tc),'text/csv');setTimeout(()=>dl(`PMJ_expenses_${d}.csv`,csv(ex,ec),'text/csv'),600);
  setTimeout(()=>dl(`PMJ_backup_${d}.json`,JSON.stringify({exported:new Date().toISOString(),trips:S.trips.map(x=>adm()?x:Object.fromEntries(Object.entries(x).filter(e=>!fin.includes(e[0])))),exps:S.exps,history:adm()?S.hist:[],settings:adm()?S.set:{}}),'application/json'),1200);
  S.set.lastExport=new Date().toISOString();save();if(auto)toast(t('autoE'));else render()}
 function autoExp(){if(!S.set.lastExport){S.set.lastExport=new Date().toISOString();return save()}if((Date.now()-new Date(S.set.lastExport))/864e5>=15)exportAll(true)}
-const _vd=vDash;vDash=function(){_vd();$('#v').insertAdjacentHTML('afterbegin',`<div class="card"><button onclick="exportAll()">⬇ ${t('exp2')}</button> <span class="mut">${t('last')}: ${(S.set.lastExport||'-').slice(0,10)}</span></div>`)};
 const _r=render;let _ae=0;render=function(){_r();if(U&&!_ae){_ae=1;autoExp()}};
+// ===== v3: LR boxes, data fixes, dashboard, Excel export =====
+const pad2=x=>String(x).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+const dmy=s=>{if(!s)return'';const[y,m,d]=s.split('-');return d+'-'+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]+'-'+y};
+function normDate(v){if(!v)return v;v=String(v);if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;const d=new Date(v);return isNaN(d)?v:ymd(d)}
+// split LR text into list. legacy=true also splits joined numbers like 966962 -> 966,962
+function splitLR(v,legacy){if(v===undefined||v===null||v==='')return{list:[],ok:true};let s=typeof v=='number'?(Number.isSafeInteger(v)?String(v):String(v)):String(v).trim();
+ if(/e\+/i.test(s))return{list:[s],ok:false};let ok=true;const out=[];
+ s.split(/[^0-9A-Za-z]+/).filter(Boolean).forEach(tk=>{if(!legacy||!/^\d{5,}$/.test(tk)){out.push(tk);return}
+  const all=[],go=(i,acc)=>{if(i==tk.length){all.push(acc);return}for(const L of[3,4]){const c=tk.slice(i,i+L);if(c.length==L&&c[0]!='0')go(i+L,acc.concat(c))}};go(0,[]);
+  let best=null,bs=1e9;all.forEach(p=>{const ns=p.map(Number),sp=Math.max(...ns)-Math.min(...ns);if(sp<bs){bs=sp;best=p}});
+  if(best&&bs<=100)out.push(...best);else{out.push(tk);if(tk.length>5)ok=false}});return{list:out,ok}}
+const lrN=x=>splitLR(x.lr).list.length;
+const lrPts=lr=>Math.max(0,splitLR(lr).list.length-1);
+function fixDates(){S.trips.concat(S.exps).forEach(x=>x.date=normDate(x.date))}
+function migrate(){fixDates();const ch=[];
+ S.trips.forEach(x=>{['driver','dest','veh'].forEach(k=>{if(typeof x[k]=='string')x[k]=x[k].trim().replace(/\s+/g,' ')});
+  if(x.deleted)return;const old={lr:String(x.lr??''),p:n(x.points),r:n(x.reimb),b:n(x.billable),pr:n(x.profit),tc:n(x.totalCost)};
+  const r=splitLR(x.lr,true);if(r.ok&&r.list.length)x.lr=r.list.join(', ');const p=Math.max(0,r.list.length-1);if(r.ok&&n(x.points)==0&&p>0)x.points=p;
+  const k=calc(x);Object.assign(x,{km:k.km,diesel:k.diesel,reimb:k.reimb,totalCost:k.total,billable:k.bill,profit:k.profit,rate:k.rate});
+  if(old.lr!=String(x.lr)||old.p!=n(x.points)||Math.abs(old.r-k.reimb)>.5||Math.abs(old.b-k.bill)>.5||Math.abs(old.pr-k.profit)>.5||Math.abs(old.tc-k.total)>.5)ch.push(x)});
+ if(ch.length){try{dl(`PMJ_backup_before_fix_${today()}.json`,JSON.stringify({trips:S.trips,exps:S.exps}),'application/json')}catch(e){}
+  ch.forEach(x=>{x._pend=1;log('Trips',x,'edit')});save();toast(ch.length+' old trips fixed (LR + money). Backup downloaded.')}}
+// ---- LR boxes in trip form
+function lrUI(){const a=FM._lr||(FM._lr=splitLR(FM.lr).list.length?splitLR(FM.lr).list:['']);
+ return `<label>${t('lr')}</label>`+a.map((v,i)=>`<div style="display:flex;gap:6px;margin-bottom:6px"><input inputmode="numeric" placeholder="LR ${i+1}" value="${esc(v)}" oninput="FM._lr[${i}]=this.value;lrSync()">${a.length>1?`<button class="s d" onclick="FM._lr.splice(${i},1);lrRe()">✕</button>`:''}</div>`).join('')+`<button class="s" onclick="FM._lr.push('');lrRe(1)">+ LR</button> <span class="mut" id="lrc">${lrTxt()}</span>`}
+function lrTxt(){const c=splitLR(FM.lr).list.length;return c?`${c} LR → ${Math.max(0,c-1)} extra point(s)`:''}
+function lrRe(f){$('#lrw').innerHTML=lrUI();lrSync();if(f){const i=$('#lrw').querySelectorAll('input');i[i.length-1].focus()}}
+function lrSync(){const l=FM._lr.flatMap(v=>splitLR(v).list);FM.lr=l.join(', ');FM.points=Math.max(0,l.length-1);const e=$('#f_points');if(e)e.value=FM.points;const c=$('#lrc');if(c)c.textContent=lrTxt();upd()}
+// ---- Start KM autofill + warnings
+const lastEnd=(veh,id)=>S.trips.filter(x=>!x.deleted&&x.veh==veh&&x.id!=id).reduce((m,x)=>Math.max(m,n(x.end)),0);
+const prevEnd=f=>S.trips.filter(x=>!x.deleted&&x.veh==f.veh&&x.id!=f.id&&n(x.start)<n(f.start)).reduce((m,x)=>Math.max(m,n(x.end)),0);
+const _fill=fill;fill=function(){const nw=!S.trips.some(x=>x.id==FM.id),le=lastEnd(FM.veh,FM.id);if(nw&&le&&!FM.start){FM.start=le;const e=$('#f_start');if(e)e.value=le}_fill()};
+const _upd=upd;upd=function(){_upd();const w=[];if(FM.veh&&FM.start){const p=prevEnd(FM);if(p&&p!=n(FM.start))w.push(`⚠ Last trip of ${esc(FM.veh)} ended at ${p} KM`)}if(n(FM.toll)>3000)w.push('⚠ Toll is very high. Check the amount');if(w.length)$('#est').insertAdjacentHTML('beforeend',`<div class="hint warn">${w.join('<br>')}</div>`)};
+const _st=saveTrip;saveTrip=async function(){const k=FM._lr;delete FM._lr;const v=String(FM.veh||'').toUpperCase().replace(/\s+/g,'');
+ const d=FM.lr&&S.trips.find(x=>x.id!=FM.id&&!x.deleted&&x.veh==v&&x.date==FM.date&&String(x.lr)==FM.lr);if(d&&!confirm('Same vehicle, date and LR already saved. Save anyway?')){FM._lr=k;return}
+ if(FM.driver)FM.driver=FM.driver.trim().replace(/\s+/g,' ');await _st();if(FM)FM._lr=k};
+// ---- search
+let Q='';
+// ---- problems
+function problems(){const P=[],A=S.trips.filter(x=>!x.deleted),by={};A.forEach(x=>(by[x.veh]=by[x.veh]||[]).push(x));
+ const add=(x,m)=>P.push({date:x.date,id:x.id,msg:m});
+ Object.values(by).forEach(L=>{L.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:n(a.start)-n(b.start));L.forEach((b,i)=>{if(n(b.end)<n(b.start))add(b,`${b.veh}: End KM smaller than Start KM`);const a=L[i-1];if(!a)return;
+  if(n(b.start)<n(a.end))add(b,`${b.veh} → ${b.dest}: starts at ${b.start} KM but earlier trip ended at ${a.end} KM`);else if(n(b.start)>n(a.end))add(b,`${b.veh} → ${b.dest}: ${n(b.start)-n(a.end)} KM missing since last trip (${a.end} → ${b.start})`)})});
+ const seen={},nr={};A.forEach(x=>{const k=x.veh+'|'+x.date+'|'+x.lr;if(x.lr&&seen[k])add(x,`${x.veh}: duplicate trip (same date + LR ${x.lr})`);seen[k]=1;
+  if(n(x.toll)>3000)add(x,`${x.veh} → ${x.dest}: toll ${fmt(n(x.toll))} looks high`);
+  const r=splitLR(x.lr,true);if(!r.ok)add(x,`${x.veh} → ${x.dest}: LR "${x.lr}" unreadable. Re-type LRs`);
+  else if(r.list.length&&n(x.points)!=r.list.length-1)add(x,`${x.veh} → ${x.dest}: ${r.list.length} LRs but ${n(x.points)} extra point(s)`);
+  if(adm()&&!calc(x).rate){const k=x.dest+' ('+x.size+')';nr[k]=nr[k]||{x,c:0};nr[k].c++}if(!x.driver)add(x,`${x.veh} → ${x.dest}: driver missing`)});
+ Object.entries(nr).forEach(([k,o])=>add(o.x,`No Onida rate: ${k}, ${o.c} trip(s). Add in Settings → Rate card`));
+ return P.sort((a,b)=>b.date>a.date?1:-1)}
+// ---- stats
+const inR=(x,f,to)=>(!f||x.date>=f)&&(!to||x.date<=to);
+function stats(f,to,inc){const T=S.trips.filter(x=>(inc||!x.deleted)&&inR(x,f,to)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:n(a.start)-n(b.start)),E=S.exps.filter(x=>(inc||!x.deleted)&&inR(x,f,to)).sort((a,b)=>a.date<b.date?-1:1);
+ const A=T.filter(x=>!x.deleted).map(x=>({x,c:calc(x)})),AE=E.filter(x=>!x.deleted),s=k=>A.reduce((t,o)=>t+o.c[k],0);
+ const tot={trips:A.length,km:s('km'),diesel:s('diesel'),toll:A.reduce((t,o)=>t+n(o.x.toll),0),labour:A.reduce((t,o)=>t+n(o.x.labour),0),pts:A.reduce((t,o)=>t+n(o.x.points),0),ex:s('ex'),reimb:s('reimb'),wages:A.reduce((t,o)=>t+n(o.x.wages),0),hal:s('hal'),total:s('total'),bill:s('bill'),profit:s('profit'),exp:AE.reduce((t,x)=>t+n(x.cost),0),lrs:A.reduce((t,o)=>t+lrN(o.x),0)};
+ tot.net=tot.profit-tot.exp;
+ const grp=key=>{const m={};A.forEach(({x,c})=>{const k=x[key]||'-',g=m[k]||(m[k]={k,trips:0,km:0,diesel:0,reimb:0,wages:0,total:0,bill:0,profit:0});g.trips++;g.km+=c.km;g.diesel+=c.diesel;g.reimb+=c.reimb;g.wages+=n(x.wages);g.total+=c.total;g.bill+=c.bill;g.profit+=c.profit});return Object.values(m).sort((a,b)=>b.trips-a.trips||b.km-a.km)};
+ const ve={};AE.forEach(x=>{ve[x.veh]=(ve[x.veh]||0)+n(x.cost)});const veh=grp('veh');veh.forEach(g=>{g.exp=ve[g.k]||0;g.net=g.profit-g.exp});
+ const xm={};AE.forEach(x=>{const k=x.desc||'-',g=xm[k]||(xm[k]={k,n:0,cost:0});g.n++;g.cost+=n(x.cost)});
+ const dm={};A.forEach(({x,c})=>{const g=dm[x.date]||(dm[x.date]={k:x.date,trips:0,bill:0,profit:0});g.trips++;g.bill+=c.bill;g.profit+=c.profit});
+ return{T,E,tot,veh,drv:grp('driver'),dest:grp('dest'),exp:Object.values(xm).sort((a,b)=>b.cost-a.cost),day:Object.values(dm).sort((a,b)=>a.k<b.k?-1:1),prob:problems().filter(p=>inR(p,f,to))}}
+// ---- date range
+let DR={p:'month',from:'',to:''},XR=null,XD=false,PX=0;
+function rng(){const d=new Date(),y=d.getFullYear(),m=d.getMonth();
+ if(DR.p=='week'){const s=new Date(y,m,d.getDate()-((d.getDay()+6)%7));return[ymd(s),ymd(new Date(s.getFullYear(),s.getMonth(),s.getDate()+6))]}
+ if(DR.p=='month')return[ymd(new Date(y,m,1)),ymd(new Date(y,m+1,0))];if(DR.p=='last')return[ymd(new Date(y,m-1,1)),ymd(new Date(y,m,0))];
+ if(DR.p=='custom')return[DR.from,DR.to];return['','']}
+function chart(day){if(!day.length)return'';let B=day;if(B.length>45){const m={};B.forEach(g=>{const k=g.k.slice(0,7),h=m[k]||(m[k]={k,trips:0,bill:0,profit:0});h.trips+=g.trips;h.bill+=g.bill;h.profit+=g.profit});B=Object.values(m)}
+ const A=adm(),v=g=>A?g.profit:g.trips,mx=Math.max(1,...B.map(g=>Math.abs(v(g)))),neg=B.some(g=>v(g)<0),W=300,H=110,z=neg?H/2:H-4,bw=W/B.length;
+ const bars=B.map((g,i)=>{const h=Math.abs(v(g))/mx*(neg?H/2-6:H-10),y=v(g)<0?z:z-h;return`<rect x="${i*bw+bw*.15}" y="${y}" width="${Math.max(1,bw*.7)}" height="${Math.max(1,h)}" rx="2" fill="${v(g)<0?'var(--warn)':'var(--acc)'}"><title>${g.k}: ${A?fmt(v(g)):v(g)+' trips'}</title></rect>`}).join('');
+ return`<div class="card"><b>${A?'Profit per '+(B===day?'day':'month'):'Trips per '+(B===day?'day':'month')}</b><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:130px;margin-top:8px"><line x1="0" x2="${W}" y1="${z}" y2="${z}" stroke="var(--ln)"/>${bars}</svg><div class="row mut" style="border:0;padding:0"><span>${dmy(B[0].k.length==7?B[0].k+'-01':B[0].k)}</span><span>${dmy(B.at(-1).k.length==7?B.at(-1).k+'-01':B.at(-1).k)}</span></div></div>`}
+const tbl=(h,rows)=>`<div style="overflow-x:auto"><table class="tb"><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;
+const pc=v=>`<span class="${v<0?'l':'p'}">${fmt(v)}</span>`;
+function vDash(){const A=adm(),[f,to]=rng(),st=stats(f,to),T=st.tot,K=(l,v,c='')=>`<div><small>${l}</small><b class="${c}">${v}</b></div>`;
+ const pr=[['week','This week'],['month','This month'],['last','Last month'],['all','All'],['custom','Custom']];
+ let h=`<div class="card"><div style="display:flex;gap:6px;flex-wrap:wrap">${pr.map(p=>`<button class="s ${DR.p==p[0]?'on2':''}" onclick="DR.p='${p[0]}';render()">${p[1]}</button>`).join('')}</div>
+ ${DR.p=='custom'?`<div class="g" style="margin-top:6px"><div><label>From</label><input type="date" value="${DR.from}" onchange="DR.from=this.value;render()"></div><div><label>To</label><input type="date" value="${DR.to}" onchange="DR.to=this.value;render()"></div></div>`:''}
+ <p class="mut" style="margin:8px 0 0">${f?dmy(f)+' → '+dmy(to):'All dates'}</p></div>
+ <div class="card"><div class="k">${K(t('trips'),T.trips)}${K('LRs',T.lrs)}${K(t('km'),T.km.toLocaleString('en-IN'))}${K(t('points'),T.pts+' · '+fmt(T.ex))}${K(t('diesel'),fmt(T.diesel))}${K(t('reimb'),fmt(T.reimb))}${K(t('wages'),fmt(T.wages))}${K(t('expTot'),fmt(T.exp))}
+ ${A?K(t('billable'),fmt(T.bill))+K(t('total'),fmt(T.total))+K('Trip profit',fmt(T.profit),T.profit<0?'l':'p')+K('Net profit',fmt(T.net),T.net<0?'l':'p')+K('Profit / KM',T.km?'₹'+(T.profit/T.km).toFixed(1):'-')+K('Profit / trip',T.trips?fmt(T.profit/T.trips):'-'):''}</div></div>`;
+ h+=chart(st.day);
+ h+=`<div class="card"><b>Vehicles</b>${tbl(A?['Vehicle','Trips','KM','Diesel','Profit','₹/KM','Net']:['Vehicle','Trips','KM','Reimb.'],st.veh.map(g=>A?[esc(g.k),g.trips,g.km,fmt(g.diesel),pc(g.profit),g.km?(g.profit/g.km).toFixed(1):'-',pc(g.net)]:[esc(g.k),g.trips,g.km,fmt(g.reimb)]))}</div>`;
+ h+=`<div class="card"><b>Drivers</b>${tbl(['Driver','Trips','KM','Wages'],st.drv.map(g=>[esc(g.k),g.trips,g.km,fmt(g.wages)]))}</div>`;
+ h+=`<div class="card"><b>${t('byDest')}</b>${tbl(A?['Destination','Trips','KM','Avg profit','Profit']:['Destination','Trips','KM'],st.dest.map(g=>A?[esc(g.k),g.trips,g.km,pc(g.profit/g.trips),pc(g.profit)]:[esc(g.k),g.trips,g.km]))}</div>`;
+ if(st.exp.length)h+=`<div class="card"><b>${t('expTot')}</b>${tbl(['Item','Count','Cost'],st.exp.map(g=>[esc(g.k),g.n,fmt(g.cost)]))}</div>`;
+ const P=st.prob;h+=`<div class="card"><b>⚠ Check these (${P.length})</b>${P.length?P.slice(0,PX?999:8).map(p=>`<div class="row" onclick="FM={...S.trips.find(y=>y.id=='${p.id}')};tab='trips';render()" style="cursor:pointer"><span>${esc(p.msg)}</span><span class="mut">${dmy(p.date)}</span></div>`).join('')+(P.length>8&&!PX?`<p><button class="s" onclick="PX=1;render()">Show all</button></p>`:''):`<p class="mut">All good ✅</p>`}</div>`;
+ const xr=XR||[f,to];h+=`<div class="card"><b>⬇ ${t('exp2')} (Excel)</b><div class="g"><div><label>From</label><input type="date" id="xf" value="${xr[0]}" onchange="XR=[this.value,$('#xt').value]"></div><div><label>To</label><input type="date" id="xt" value="${xr[1]}" onchange="XR=[$('#xf').value,this.value]"></div></div>
+ <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" ${XD?'checked':''} onchange="XD=this.checked"> Include deleted trips</label>
+ <p><button onclick="xlsxOut($('#xf').value,$('#xt').value,XD)">⬇ Download Excel</button> <button class="s" onclick="exportAll()">Backup file</button></p><p class="mut">${t('last')}: ${(S.set.lastExport||'-').slice(0,10)} · leave dates empty = all</p></div>`;
+ $('#v').innerHTML=h}
+// ---- Excel
+function loadX(){return window.ExcelJS?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';s.onload=ok;s.onerror=no;document.head.append(s)})}
+async function xlsxOut(f,to,inc){if(f&&to&&f>to)return toast('From date is after To date');toast('Making Excel…');try{await loadX()}catch(e){return toast('Need internet to make Excel')}
+ try{const wb=await buildWB(f,to,inc),buf=await wb.xlsx.writeBuffer();dl(`PMJ_report_${f||'start'}_to_${to||today()}.xlsx`,new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));S.set.lastExport=new Date().toISOString();save()}catch(e){toast('Excel error: '+e.message)}}
+const xd=s=>{const[y,m,d]=String(s).split('-').map(Number);return y?Date.UTC(y,m-1,d)/864e5+25569:s};
+async function buildWB(f,to,inc){const A=adm(),st=stats(f,to,inc),T=st.tot,wb=new ExcelJS.Workbook();wb.creator='PMJ Transporter';wb.created=new Date();
+ const G='FF0F5C4D',LG='FFE6F0EC',ZB='FFF7F7F4',RS='₹#,##0;[Red]-₹#,##0',NF='#,##0',DF='dd-mmm-yyyy',thin={style:'thin',color:{argb:'FFD5D5D0'}},BD={top:thin,left:thin,bottom:thin,right:thin};
+ const head=r=>{r.eachCell(c=>{c.font={bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:G}};c.alignment={vertical:'middle',horizontal:'center',wrapText:true};c.border=BD});r.height=32};
+ const period=(f?dmy(f):'Start')+'  to  '+(to?dmy(to):dmy(today()));
+ // table writer: cols [{h,w,fmt,v,sum}]
+ function table(ws,cols,rows,opt={}){const r0=ws.lastRow?ws.lastRow.number+(opt.gap??2):1;if(opt.title){const tr=ws.getRow(r0);tr.getCell(1).value=opt.title;tr.getCell(1).font={bold:true,size:13,color:{argb:G}};}
+  const hr=ws.getRow(r0+(opt.title?1:0));cols.forEach((c,i)=>hr.getCell(i+1).value=c.h);head(hr);
+  rows.forEach((o,j)=>{const r=ws.getRow(hr.number+1+j);cols.forEach((c,i)=>{const cell=r.getCell(i+1);cell.value=c.v(o);if(c.fmt)cell.numFmt=c.fmt;cell.border=BD;if(j%2)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZB}};if(o.deleted)cell.font={italic:true,strike:true,color:{argb:'FF999999'}}})});
+  const last=hr.number+rows.length;if(opt.total&&rows.length){const r=ws.getRow(last+1);r.getCell(1).value='TOTAL';cols.forEach((c,i)=>{const cell=r.getCell(i+1);if(c.sum){const L=ws.getColumn(i+1).letter,res=rows.reduce((t,o)=>t+(o.deleted?0:(+c.v(o)||0)),0);cell.value=opt.del?{formula:`SUMIFS(${L}${hr.number+1}:${L}${last},${opt.del}${hr.number+1}:${opt.del}${last},"Active")`,result:res}:{formula:`SUM(${L}${hr.number+1}:${L}${last})`,result:res};cell.numFmt=c.fmt||NF}
+   cell.font={bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:LG}};cell.border={top:{style:'medium',color:{argb:G}},bottom:{style:'medium',color:{argb:G}}}})}
+  return hr}
+ // Summary
+ const sm=wb.addWorksheet('Summary',{views:[{showGridLines:false}],pageSetup:{orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+ sm.columns=[{width:36},{width:13},{width:13},{width:14},{width:14},{width:14},{width:14},{width:14},{width:14}];
+ sm.mergeCells('A1:I1');const t1=sm.getCell('A1');t1.value='PMJ Transporter — Trip Report';t1.font={bold:true,size:18,color:{argb:'FFFFFFFF'}};t1.fill={type:'pattern',pattern:'solid',fgColor:{argb:G}};t1.alignment={vertical:'middle',indent:1};sm.getRow(1).height=34;
+ sm.mergeCells('A2:I2');sm.getCell('A2').value=`Period: ${period}     ·     Made on: ${dmy(today())}     ·     ${A?'Admin':'Transporter'} copy`;sm.getCell('A2').font={italic:true,color:{argb:'FF555555'}};
+ const kp=[['Trips',T.trips,NF],['LRs',T.lrs,NF],['Total KM',T.km,NF],['Extra points',T.pts,NF],['Extra points amount',T.ex,RS],['Toll',T.toll,RS],['Labour',T.labour,RS],['Reimbursable (toll + labour + extra pts)',T.reimb,RS],['Driver wages',T.wages,RS],['Halting charges',T.hal,RS],['Other expenses',T.exp,RS]];
+ if(A)kp.splice(3,0,['Diesel cost',T.diesel,RS]),kp.push(['Billable to Onida',T.bill,RS],['Total trip cost',T.total,RS],['Trip profit',T.profit,RS],['Net profit (after other expenses)',T.net,RS],['Profit per KM',T.km?T.profit/T.km:0,'₹#,##0.0'],['Profit per trip',T.trips?T.profit/T.trips:0,RS]);
+ let r=4;sm.getCell('A'+r).value='Key numbers';sm.getCell('A'+r).font={bold:true,size:13,color:{argb:G}};
+ kp.forEach((k,i)=>{const row=sm.getRow(r+1+i);row.getCell(1).value=k[0];row.getCell(2).value=k[1];row.getCell(2).numFmt=k[2];[1,2].forEach(c=>{row.getCell(c).border=BD;if(i%2)row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:ZB}}});
+  if(/profit/i.test(k[0])&&!/per/.test(k[0])||k[0].startsWith('Billable')){row.getCell(1).font={bold:true};row.getCell(2).font={bold:true,size:12}}});
+
+ const S2=x=>x.k;
+ table(sm,A?[{h:'Vehicle',v:S2},{h:'Trips',v:g=>g.trips,sum:1},{h:'KM',v:g=>g.km,fmt:NF,sum:1},{h:'Diesel',v:g=>g.diesel,fmt:RS,sum:1},{h:'Reimbursable',v:g=>g.reimb,fmt:RS,sum:1},{h:'Trip cost',v:g=>g.total,fmt:RS,sum:1},{h:'Billable',v:g=>g.bill,fmt:RS,sum:1},{h:'Trip profit',v:g=>g.profit,fmt:RS,sum:1},{h:'Net (after exp.)',v:g=>g.net,fmt:RS,sum:1}]
+  :[{h:'Vehicle',v:S2},{h:'Trips',v:g=>g.trips,sum:1},{h:'KM',v:g=>g.km,fmt:NF,sum:1},{h:'Reimbursable',v:g=>g.reimb,fmt:RS,sum:1},{h:'Other expenses',v:g=>g.exp,fmt:RS,sum:1}],st.veh,{title:'By vehicle',total:1});
+ table(sm,[{h:'Driver',v:S2},{h:'Trips',v:g=>g.trips,sum:1},{h:'KM',v:g=>g.km,fmt:NF,sum:1},{h:'Wages',v:g=>g.wages,fmt:RS,sum:1}],st.drv,{title:'By driver',total:1});
+ table(sm,A?[{h:'Destination',v:S2},{h:'Trips',v:g=>g.trips,sum:1},{h:'KM',v:g=>g.km,fmt:NF,sum:1},{h:'Billable',v:g=>g.bill,fmt:RS,sum:1},{h:'Avg profit / trip',v:g=>g.profit/g.trips,fmt:RS},{h:'Total profit',v:g=>g.profit,fmt:RS,sum:1}]
+  :[{h:'Destination',v:S2},{h:'Trips',v:g=>g.trips,sum:1},{h:'KM',v:g=>g.km,fmt:NF,sum:1}],st.dest,{title:'By destination',total:1});
+ if(st.exp.length)table(sm,[{h:'Expense item',v:S2},{h:'Count',v:g=>g.n,sum:1},{h:'Cost',v:g=>g.cost,fmt:RS,sum:1}],st.exp,{title:'Other expenses by item',total:1});
+ if(st.prob.length){const hr=table(sm,[{h:'Date',v:p=>xd(p.date),fmt:DF},{h:'Problem to check',v:p=>p.msg}],st.prob,{title:`Check these (${st.prob.length})`});
+  for(let i=hr.number;i<=hr.number+st.prob.length;i++)sm.mergeCells(`B${i}:I${i}`)}
+ // Trips
+ const tw=wb.addWorksheet('Trips',{views:[{state:'frozen',xSplit:2,ySplit:1}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+ const C=[{h:'Date',w:12,fmt:DF,v:x=>xd(x.date)},{h:'LR No(s)',w:22,v:x=>splitLR(x.lr).list.join(', ')},{h:'LR count',w:7,v:x=>lrN(x),sum:1},{h:'Vehicle',w:13,v:x=>x.veh},{h:'Size',w:17,v:x=>x.size},{h:'Destination',w:14,v:x=>x.dest},{h:'Driver',w:15,v:x=>x.driver},
+  {h:'Start KM',w:10,fmt:NF,v:x=>n(x.start)},{h:'End KM',w:10,fmt:NF,v:x=>n(x.end)},{h:'KM',w:8,fmt:NF,v:x=>x._c.km,sum:1},{h:'Diesel ₹/KM',w:9,fmt:'0.0#',v:x=>x._c.dk,fin:1},{h:'Diesel',w:11,fmt:RS,v:x=>x._c.diesel,sum:1,fin:1},
+  {h:'Toll',w:10,fmt:RS,v:x=>n(x.toll),sum:1},{h:'Labour',w:10,fmt:RS,v:x=>n(x.labour),sum:1},{h:'Extra pts',w:7,v:x=>n(x.points),sum:1},{h:'Extra pts ₹',w:10,fmt:RS,v:x=>x._c.ex,sum:1},{h:'Reimbursable',w:12,fmt:RS,v:x=>x._c.reimb,sum:1},
+  {h:'Driver wages',w:10,fmt:RS,v:x=>n(x.wages),sum:1},{h:'Halting days',w:8,v:x=>n(x.hdays),sum:1},{h:'Halting ₹',w:10,fmt:RS,v:x=>x._c.hal,sum:1},
+  {h:'Trip cost',w:11,fmt:RS,v:x=>x._c.total,sum:1,fin:1},{h:'Onida rate',w:11,fmt:RS,v:x=>x._c.rate,sum:1,fin:1},{h:'Billable',w:12,fmt:RS,v:x=>x._c.bill,sum:1,fin:1},{h:'Profit',w:12,fmt:RS,v:x=>x._c.profit,sum:1,fin:1},{h:'Remark',w:20,v:x=>x.remark||''}].filter(c=>A||!c.fin);
+ if(inc)C.push({h:'Status',w:9,v:x=>x.deleted?'Deleted':'Active'});
+ C.forEach((c,i)=>tw.getColumn(i+1).width=c.w);const TR=st.T.map(x=>Object.assign(Object.create(x),{_c:calc(x),deleted:x.deleted}));
+ const th=table(tw,C,TR,{total:1,del:inc?tw.getColumn(C.length).letter:0});tw.autoFilter={from:{row:1,column:1},to:{row:1+TR.length,column:C.length}};
+ const pi=C.findIndex(c=>c.h=='Profit');if(pi>=0)TR.forEach((x,j)=>{if(x._c.profit<0)tw.getRow(2+j).getCell(pi+1).font={bold:true,color:{argb:'FFB4412A'}}});
+ // Expenses
+ const ew=wb.addWorksheet('Expenses',{views:[{state:'frozen',ySplit:1}]});const EC=[{h:'Date',w:12,fmt:DF,v:x=>xd(x.date)},{h:'Vehicle',w:13,v:x=>x.veh},{h:'Item',w:18,v:x=>x.desc},{h:'Qty',w:6,v:x=>n(x.qty),sum:1},{h:'Cost',w:12,fmt:RS,v:x=>n(x.cost),sum:1},{h:'Remark',w:24,v:x=>x.remark||''},{h:'Bill',w:12,v:x=>x.billUrl&&/^https?:/.test(x.billUrl)?{text:'View bill',hyperlink:x.billUrl}:(x.billUrl?'On phone':'')}];
+ if(inc)EC.push({h:'Status',w:9,v:x=>x.deleted?'Deleted':'Active'});EC.forEach((c,i)=>ew.getColumn(i+1).width=c.w);
+ table(ew,EC,st.E,{total:1,del:inc?ew.getColumn(EC.length).letter:0});if(st.E.length)ew.autoFilter={from:{row:1,column:1},to:{row:1+st.E.length,column:EC.length}};
+ ew.getColumn(7).eachCell((c,i)=>{if(i>1&&c.value&&c.value.hyperlink)c.font={color:{argb:'FF1155CC'},underline:true}});
+ return wb}
+// backup (JSON). auto = every 15 days
+exportAll=function(auto){const fin=['rate','diesel','totalCost','billable','profit'],d=today();dl(`PMJ_backup_${d}.json`,JSON.stringify({exported:new Date().toISOString(),trips:S.trips.map(x=>adm()?x:Object.fromEntries(Object.entries(x).filter(e=>!fin.includes(e[0])))),exps:S.exps,history:adm()?S.hist:[],settings:adm()?S.set:{}}),'application/json');
+ S.set.lastExport=new Date().toISOString();save();if(auto)toast(t('autoE'));else render()};
+fixDates();
+
 let IP=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();IP=e;const b=document.createElement('button');b.className='inst';b.textContent='⬇ Install app';b.style.cssText='position:fixed;right:12px;bottom:80px;z-index:9;box-shadow:0 2px 8px #0005';b.onclick=()=>{IP.prompt();b.remove()};document.body.append(b)});
 addEventListener('appinstalled',()=>document.querySelectorAll('.inst').forEach(e=>e.remove()));
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
